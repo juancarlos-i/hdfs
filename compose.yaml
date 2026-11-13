@@ -1,0 +1,86 @@
+name: ud02-hdfs-lab
+
+services:
+  preparar-volumenes:
+    image: apache/hadoop:3.5.0
+    user: "0:0"
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["chown -R 1001:100 /volumenes/namenode /volumenes/datanode1 /volumenes/datanode2 && chmod 0777 /laboratorio/salida"]
+    volumes:
+      - namenode-datos:/volumenes/namenode
+      - datanode1-datos:/volumenes/datanode1
+      - datanode2-datos:/volumenes/datanode2
+      - ./salida:/laboratorio/salida
+    networks:
+      - red-hdfs
+
+  namenode:
+    image: apache/hadoop:3.5.0
+    hostname: namenode
+    command: ["hdfs", "namenode"]
+    environment:
+      ENSURE_NAMENODE_DIR: /datos/namenode/current
+    depends_on:
+      preparar-volumenes:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:9870:9870"
+    volumes:
+      - namenode-datos:/datos/namenode
+      - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ./datos:/laboratorio/datos:ro
+      - ./salida:/laboratorio/salida
+    networks:
+      - red-hdfs
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://localhost:9870/ >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  datanode1:
+    image: apache/hadoop:3.5.0
+    hostname: datanode1
+    command: ["hdfs", "datanode"]
+    environment:
+      WAITFOR: namenode:9000
+    depends_on:
+      preparar-volumenes:
+        condition: service_completed_successfully
+      namenode:
+        condition: service_healthy
+    volumes:
+      - datanode1-datos:/datos/datanode
+      - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+    networks:
+      - red-hdfs
+
+  datanode2:
+    image: apache/hadoop:3.5.0
+    hostname: datanode2
+    command: ["hdfs", "datanode"]
+    environment:
+      WAITFOR: namenode:9000
+    depends_on:
+      preparar-volumenes:
+        condition: service_completed_successfully
+      namenode:
+        condition: service_healthy
+    volumes:
+      - datanode2-datos:/datos/datanode
+      - ./config/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ./config/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+    networks:
+      - red-hdfs
+
+networks:
+  red-hdfs:
+    name: ud02-red-hdfs
+
+volumes:
+  namenode-datos:
+  datanode1-datos:
+  datanode2-datos:
